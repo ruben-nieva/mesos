@@ -1,0 +1,6 @@
+*.zip*
+*.rpm*
+*.tar.gz*
+*.swp
+*.swo
+.vagrant
