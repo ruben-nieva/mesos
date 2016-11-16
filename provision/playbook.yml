@@ -54,8 +54,8 @@
         template: src=./hosts.j2 dest=/etc/hosts
       - name: install mesosphere yum repo
         yum: name=http://repos.mesosphere.com/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm state=present
-      - name: install mesos and docker packages
-        yum: pkg=device-mapper-event-libs,mesos,docker state=latest
+      - name: install mesos
+        yum: pkg=device-mapper-event-libs,mesos state=latest
       - name: configure dns
         blockinfile:
           dest: /etc/resolv.conf
@@ -63,6 +63,14 @@
             search cba.corp.globant.com
             nameserver 192.168.33.10
             nameserver 10.0.2.3
+      - name: configure docker's repository
+        template: src=./docker.repo dest=/etc/yum.repos.d
+      - name: install docker packages
+        yum: pkg=docker-engine state=latest
+      - name: install docker compose
+        shell: curl -L "https://github.com/docker/compose/releases/download/1.8.1/docker-compose-$(uname -s)-$(uname -m)" > /usr/local/bin/docker-compose
+      - name: given permission to docker-compose
+        shell: chmod +x /usr/local/bin/docker-compose
       - name: configure containerizers
         lineinfile: dest=/etc/mesos-slave/containerizers create=yes line="docker,mesos"
       - name: set zookeeper master
@@ -71,3 +79,31 @@
         service: name=mesos-slave state=started enabled=yes
       - name: start docker
         service: name=docker state=started enabled=yes
+
+# Mesos agent nodes
+- hosts: ubuntu
+  remote_user: vagrant
+  become: yes
+  become_method: sudo
+  tasks:
+      - name: install common packages
+        apt:
+          name: git,apt-transport-https,ca-certificates
+          state: latest
+          update_cache: yes
+      - name: install docker repo
+        shell: apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+      - name: configure repo
+        lineinfile: dest=/etc/apt/sources.list.d/docker.list create=yes line="deb https://apt.dockerproject.org/repo ubuntu-trusty main"
+      - name: install docker
+        apt:
+           name: docker-engine
+           state: latest
+           update_cache: yes
+      - name: install docker-compose
+        get_url:
+             url: https://github.com/docker/compose/releases/download/1.8.1/docker-compose-Linux-x86_64
+             dest: /usr/local/bin/docker-compose
+             mode: 0755
+             owner: root
+             group: root
